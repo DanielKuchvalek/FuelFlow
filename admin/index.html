@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="cs" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#171717">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Fuel Flow – Administrace</title>
+
+  <script>
+    try {
+      var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('fuelflow_theme') || systemTheme);
+    } catch (e) { /* localStorage může být zakázaný */ }
+  </script>
+
+  <link rel="stylesheet" href="../vendor/fonts/outfit.css">
+  <link rel="stylesheet" href="../css/style.css?v=7.0">
+  <link rel="stylesheet" href="admin.css?v=7.0">
+  <script src="../vendor/chart.umd.min.js"></script>
+</head>
+<body class="admin-body">
+
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="goo">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" result="goo" />
+        <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- PŘIHLÁŠENÍ DO ADMINISTRACE -->
+  <div id="adminLogin" class="auth-wrapper hidden">
+    <div class="auth-liquid-bg" aria-hidden="true">
+      <span class="aurora a1"></span>
+      <span class="aurora a2"></span>
+      <span class="aurora a3"></span>
+      <div class="auth-grid-lines"></div>
+    </div>
+    <div class="admin-login-layout">
+      <div class="auth-box glass-panel">
+        <div class="auth-head">
+          <div class="auth-icon-badge brand-mark">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+          </div>
+          <h2>Fuel <span class="text-green">Admin</span></h2>
+          <p>Přihlaste se účtem s oprávněním administrátora</p>
+        </div>
+
+        <div id="adminLoginAlert" class="auth-alert hidden" role="alert"></div>
+
+        <form id="adminLoginForm" novalidate>
+          <div class="form-group">
+            <label for="adminEmailInput">E-mail</label>
+            <input type="email" id="adminEmailInput" autocomplete="email" placeholder="admin@email.cz" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+          </div>
+          <div class="form-group">
+            <label for="adminPasswordInput">Heslo</label>
+            <input type="password" id="adminPasswordInput" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn-action-primary w-full btn-lg">
+            <span class="btn-text">Vstoupit do administrace</span>
+          </button>
+        </form>
+        <a href="../" class="auth-privacy-link">← Zpět do aplikace</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMINISTRACE -->
+  <div id="adminApp" class="admin-shell hidden">
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <div class="brand-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path><path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path></svg>
+        </div>
+        <div>
+          <span class="brand-name">Fuel<b>Flow</b></span>
+          <span class="admin-badge">ADMIN</span>
+        </div>
+      </div>
+
+      <nav class="admin-nav liquid-group" id="adminNav" aria-label="Administrace">
+        <button type="button" class="liquid-item admin-nav-link active" data-view="overview">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="7" rx="2"></rect></svg>
+          <span>Přehled</span>
+        </button>
+        <button type="button" class="liquid-item admin-nav-link" data-view="users">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Uživatelé</span>
+        </button>
+        <button type="button" class="liquid-item admin-nav-link" data-view="audit">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>Audit log</span>
+        </button>
+      </nav>
+
+      <div class="admin-sidebar-card">
+        <strong>Bezpečnost</strong>
+        <p>Každá změna v administraci se zapisuje do auditního logu.</p>
+      </div>
+
+      <a href="../" class="admin-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Zpět do aplikace
+      </a>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-top">
+        <div>
+          <p class="hero-eyebrow" id="adminDate"></p>
+          <h1 id="adminTitle">Přehled</h1>
+        </div>
+        <div class="nav-right">
+          <button id="themeToggleBtn" class="btn-circle-action" title="Přepnout režim" aria-label="Přepnout světlý / tmavý režim">
+            <svg id="moonIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg id="sunIcon" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </button>
+          <div class="user-chip">
+            <div class="user-circle" id="adminAvatar">A</div>
+            <div class="user-info">
+              <span class="user-name" id="adminEmail">admin</span>
+              <span class="user-status"><i class="dot-online"></i> Administrátor</span>
+            </div>
+            <button id="adminLogoutBtn" class="logout-icon-btn" title="Odhlásit se" aria-label="Odhlásit se">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- PŘEHLED -->
+      <section class="admin-view" data-panel="overview">
+        <div class="kpi-row">
+          <div class="kpi-box kpi-feature glow-card">
+            <div class="kpi-feature-glow" aria-hidden="true"></div>
+            <div class="kpi-top"><span class="kpi-title">Uživatelé</span></div>
+            <div class="kpi-value"><span id="stUsers">0</span></div>
+            <div class="kpi-foot"><span class="dot-small"></span> <span id="stUsersSub">0 nových za 30 dní</span></div>
+          </div>
+          <div class="kpi-box glow-card">
+            <div class="kpi-top"><span class="kpi-title">Aktivní za 30 dní</span></div>
+            <div class="kpi-value"><span id="stActive">0</span></div>
+            <div class="kpi-foot text-muted" id="stAdmins">0 administrátorů</div>
+          </div>
+          <div class="kpi-box glow-card">
+            <div class="kpi-top"><span class="kpi-title">Tankování celkem</span></div>
+            <div class="kpi-value"><span id="stRecords">0</span></div>
+            <div class="kpi-foot text-muted" id="stVehicles">0 vozidel</div>
+          </div>
+          <div class="kpi-box glow-card">
+            <div class="kpi-top"><span class="kpi-title">Evidovaná útrata</span></div>
+            <div class="kpi-value"><span id="stAmount">0</span> <small>Kč</small></div>
+            <div class="kpi-foot text-muted" id="stLitres">0 l paliva</div>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <div class="chart-card-clean glow-card">
+            <div class="chart-header">
+              <div>
+                <h3>Aktivita za 12 měsíců</h3>
+                <p>Nové registrace a počet tankování po měsících</p>
+              </div>
+            </div>
+            <div class="canvas-holder"><canvas id="adminChart"></canvas></div>
+          </div>
+          <div class="chart-card-clean">
+            <div class="chart-header">
+              <div>
+                <h3>Poslední akce</h3>
+                <p>Změny provedené v administraci</p>
+              </div>
+              <button type="button" class="btn-footer-action" data-goto="audit">Vše</button>
+            </div>
+            <div class="audit-list" id="auditMini"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- UŽIVATELÉ -->
+      <section class="admin-view hidden" data-panel="users">
+        <div class="admin-toolbar">
+          <div class="search-input-field">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="userSearch" placeholder="Hledat podle e-mailu…" aria-label="Hledat uživatele" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false">
+          </div>
+          <div class="segmented-control liquid-group" id="roleFilter" role="group" aria-label="Role">
+            <button type="button" class="seg-btn liquid-item active" data-role="all">Všichni</button>
+            <button type="button" class="seg-btn liquid-item" data-role="admin">Admini</button>
+            <button type="button" class="seg-btn liquid-item" data-role="user">Uživatelé</button>
+          </div>
+          <div class="admin-sort">
+            <select id="userSort" aria-label="Řazení">
+              <option value="created:desc">Nejnovější registrace</option>
+              <option value="created:asc">Nejstarší registrace</option>
+              <option value="login:desc">Poslední přihlášení</option>
+              <option value="amount:desc">Nejvyšší útrata</option>
+              <option value="records:desc">Nejvíc tankování</option>
+              <option value="email:asc">E-mail A–Z</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container-card">
+          <div class="user-list-head">
+            <span>Uživatel</span><span>Registrace</span><span>Poslední přihlášení</span><span>Auta</span><span>Tankování</span><span>Útrata</span><span></span>
+          </div>
+          <div class="user-list" id="userList"></div>
+          <div class="admin-pagination" id="userPagination"></div>
+        </div>
+      </section>
+
+      <!-- AUDIT -->
+      <section class="admin-view hidden" data-panel="audit">
+        <div class="table-container-card">
+          <div class="table-head-row">
+            <div>
+              <h3>Audit log</h3>
+              <p>Posledních 100 akcí v administraci – kdo, co, komu a kdy</p>
+            </div>
+          </div>
+          <div class="audit-list is-full" id="auditList"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- DETAIL UŽIVATELE (vysouvací panel) -->
+  <div id="userDrawer" class="drawer-overlay hidden" data-lenis-prevent>
+    <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerEmail">
+      <div class="drawer-head">
+        <div class="modal-title">
+          <div class="icon-circle account-avatar" id="drawerAvatar">U</div>
+          <div>
+            <h3 id="drawerEmail">uzivatel@email.cz</h3>
+            <p id="drawerMeta"></p>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="closeDrawerBtn" aria-label="Zavřít">&times;</button>
+      </div>
+      <div class="drawer-body" id="drawerBody"></div>
+    </aside>
+  </div>
+
+  <!-- MODAL: NOVÉ HESLO -->
+  <div id="resetModal" class="modal-overlay hidden">
+    <div class="modal-card modal-confirm-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <div>
+            <h3>Nastavit nové heslo</h3>
+            <p id="resetFor"></p>
+          </div>
+        </div>
+      </div>
+      <form id="resetForm">
+        <div class="form-group">
+          <label for="resetPassword">Nové heslo (6–72 znaků)</label>
+          <div class="input-with-action">
+            <input type="text" id="resetPassword" minlength="6" maxlength="72" autocomplete="off" required>
+            <button type="button" class="btn-quick-val" id="generatePasswordBtn">Vygenerovat</button>
+          </div>
+        </div>
+        <p class="account-note">Heslo předejte uživateli bezpečnou cestou a doporučte mu ho po přihlášení změnit.</p>
+        <div class="modal-foot">
+          <button type="button" class="btn-secondary" id="cancelResetBtn">Zrušit</button>
+          <button type="submit" class="btn-action-primary">Uložit heslo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: POTVRZENÍ AKCE -->
+  <div id="confirmModal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <div class="modal-card modal-confirm-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle danger-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </div>
+          <div>
+            <h3 id="confirmTitle">Opravdu smazat?</h3>
+            <p id="confirmMessage"></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="confirmCancelBtn" class="btn-secondary">Zrušit</button>
+        <button type="button" id="confirmOkBtn" class="btn-danger">Smazat</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+  <script type="module" src="admin.js?v=7.1"></script>
+</body>
+</html>

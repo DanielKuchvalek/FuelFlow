@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="cs" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <!-- Barva stavového řádku: tmavá pod úvodní animací, pak ji podle motivu přepíná app.js -->
+  <meta name="theme-color" content="#0b0b0d">
+  <title>Fuel Flow – Evidence výdajů za palivo</title>
+
+  <!-- Téma nastavíme ještě před vykreslením, aby tmavý režim neproblikl světlým -->
+  <script>
+    try {
+      // Bez uloženého výběru se řídíme nastavením systému
+      var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('fuelflow_theme') || systemTheme);
+    } catch (e) { /* localStorage může být zakázaný */ }
+  </script>
+
+  <!-- Vše se načítá z vlastního serveru – žádné požadavky na třetí strany (Google, CDN) -->
+  <link rel="stylesheet" href="vendor/fonts/outfit.css">
+  <link rel="stylesheet" href="css/style.css?v=7.0">
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/confetti.browser.min.js"></script>
+  <script src="vendor/lenis.min.js"></script>
+</head>
+<body>
+
+  <!-- SVG filtr pro „tekutý“ efekt navigace (spojování kapek) -->
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="goo">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" result="goo" />
+        <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+      </filter>
+      <clipPath id="dropClip" clipPathUnits="userSpaceOnUse">
+        <path d="M60 6C60 6 16 62 16 98a44 44 0 0 0 88 0C104 62 60 6 60 6Z" />
+      </clipPath>
+    </defs>
+  </svg>
+
+  <!-- SPLASH LOADER: kapka paliva, která se naplní -->
+  <div id="splashScreen" class="splash-screen" role="status" aria-live="polite">
+    <div class="splash-aurora" aria-hidden="true">
+      <span class="aurora a1"></span>
+      <span class="aurora a2"></span>
+      <span class="aurora a3"></span>
+    </div>
+    <div class="splash-core">
+      <svg class="fuel-drop" viewBox="0 0 120 150" aria-hidden="true">
+        <g clip-path="url(#dropClip)">
+          <rect x="0" y="0" width="120" height="150" class="drop-bg" />
+          <g class="drop-level">
+            <path class="drop-wave wave-back" d="M0 12 Q30 0 60 12 T120 12 T180 12 T240 12 V160 H0 Z" />
+            <path class="drop-wave wave-front" d="M0 12 Q30 24 60 12 T120 12 T180 12 T240 12 V160 H0 Z" />
+          </g>
+          <circle class="drop-bubble b1" cx="44" cy="130" r="3" />
+          <circle class="drop-bubble b2" cx="70" cy="136" r="2.2" />
+          <circle class="drop-bubble b3" cx="58" cy="140" r="1.6" />
+        </g>
+        <path class="drop-outline" d="M60 6C60 6 16 62 16 98a44 44 0 0 0 88 0C104 62 60 6 60 6Z" />
+        <path class="drop-shine" d="M38 84c0-10 6-22 12-31" />
+      </svg>
+      <h2 class="splash-brand">Fuel<span>Flow</span></h2>
+      <p class="splash-text">Načítám vaše data…</p>
+      <div class="splash-progress"><span></span></div>
+    </div>
+  </div>
+
+  <!-- AUTH PORTÁL -->
+  <div id="authPortal" class="auth-wrapper hidden" data-lenis-prevent>
+    <div class="auth-liquid-bg" aria-hidden="true">
+      <span class="aurora a1"></span>
+      <span class="aurora a2"></span>
+      <span class="aurora a3"></span>
+      <span class="aurora a4"></span>
+      <div class="auth-grid-lines"></div>
+    </div>
+
+    <div class="auth-layout">
+      <div class="auth-showcase">
+        <div class="brand-mark big">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path>
+            <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path>
+            <path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path>
+          </svg>
+        </div>
+        <h1 class="showcase-title">Každá koruna za palivo<br><span>pod kontrolou.</span></h1>
+        <p class="showcase-text">Evidujte tankování, hlídejte měsíční rozpočet a sledujte ceny za litr napříč celým vozovým parkem.</p>
+        <div class="showcase-chips">
+          <span class="chip"><i></i> Grafy výdajů</span>
+          <span class="chip"><i></i> Hlídač rozpočtu</span>
+          <span class="chip"><i></i> Export CSV / PDF</span>
+        </div>
+      </div>
+
+      <div class="auth-box glass-panel">
+        <div class="auth-head">
+          <div class="auth-icon-badge brand-mark">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path>
+              <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path>
+              <path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path>
+            </svg>
+          </div>
+          <h2>Fuel <span class="text-green">Flow</span></h2>
+          <p id="authSubtitle">Přihlaste se ke svému účtu</p>
+        </div>
+
+        <div class="auth-tabs liquid-group">
+          <button id="tabLogin" class="tab-btn liquid-item active" type="button">Přihlášení</button>
+          <button id="tabRegister" class="tab-btn liquid-item" type="button">Nový účet</button>
+        </div>
+
+        <div id="authAlert" class="auth-alert hidden" role="alert"></div>
+
+        <form id="authForm" novalidate>
+          <div class="form-group">
+            <label for="authEmail">E-mail</label>
+            <div class="input-icon-wrap">
+              <svg class="input-svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <input type="email" id="authEmail" placeholder="vas@email.cz" required autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="authPassword">Heslo</label>
+            <div class="input-icon-wrap">
+              <svg class="input-svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <input type="password" id="authPassword" placeholder="Minimálně 6 znaků" required autocomplete="current-password" enterkeyhint="go">
+              <button type="button" id="togglePasswordVisibility" class="btn-eye-toggle" title="Zobrazit/skrýt heslo" aria-label="Zobrazit nebo skrýt heslo">
+                <svg id="eyeOpenIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <svg id="eyeClosedIcon" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div id="passwordStrengthWrapper" class="strength-meter-box hidden">
+              <div class="meter-bars">
+                <span class="bar" id="bar1"></span>
+                <span class="bar" id="bar2"></span>
+                <span class="bar" id="bar3"></span>
+                <span class="bar" id="bar4"></span>
+              </div>
+              <div class="strength-info">
+                <span class="strength-text" id="strengthText">Zadejte heslo</span>
+                <span class="strength-hint" id="strengthHint">Minimálně 6 znaků</span>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="authSubmitBtn" class="btn-action-primary w-full btn-lg">
+            <span class="btn-text">Přihlásit se</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
+        </form>
+
+        <div class="auth-security-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          Hesla ukládáme pouze jako bezpečný hash
+        </div>
+        <button type="button" class="auth-privacy-link" data-open-privacy>Soukromí a cookies</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HLAVNÍ DASHBOARD -->
+  <div id="mainApp" class="dashboard-container hidden">
+
+    <!-- HORNÍ LIŠTA -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="brand-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path>
+            <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path>
+            <path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path>
+          </svg>
+        </div>
+        <span class="brand-name">Fuel<b>Flow</b></span>
+      </div>
+
+      <!-- Tekutá navigace: kapka se přelévá mezi sekcemi -->
+      <nav class="liquid-nav liquid-group" id="sectionNav" aria-label="Sekce aplikace">
+        <a href="#sec-overview" class="liquid-item nav-link active" data-section="sec-overview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"></rect><rect x="14" y="3" width="7" height="7" rx="2"></rect><rect x="3" y="14" width="7" height="7" rx="2"></rect><rect x="14" y="14" width="7" height="7" rx="2"></rect></svg>
+          <span>Přehled</span>
+        </a>
+        <a href="#sec-budget" class="liquid-item nav-link" data-section="sec-budget">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path></svg>
+          <span>Rozpočet</span>
+        </a>
+        <a href="#sec-charts" class="liquid-item nav-link" data-section="sec-charts">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>Analýza</span>
+        </a>
+        <a href="#sec-service" class="liquid-item nav-link" data-section="sec-service">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          <span>Servis</span>
+        </a>
+        <a href="#sec-history" class="liquid-item nav-link" data-section="sec-history">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+          <span>Historie</span>
+        </a>
+      </nav>
+
+      <div class="nav-right">
+        <button id="openHelpBtn" class="btn-circle-action" title="Jak to funguje?" aria-label="Jak to funguje?">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+
+        <button id="themeToggleBtn" class="btn-circle-action" title="Přepnout režim" aria-label="Přepnout světlý / tmavý režim">
+          <svg id="moonIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg id="sunIcon" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+
+        <div class="user-chip">
+          <div class="user-circle" id="userAvatar">U</div>
+          <div class="user-info">
+            <span class="user-name" id="userEmailDisplay">uzivatel@email.cz</span>
+            <span class="user-status"><i class="dot-online"></i> Synchronizováno</span>
+          </div>
+          <a id="adminLink" href="admin/" class="logout-icon-btn admin-link hidden" title="Administrace" aria-label="Administrace">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+          </a>
+          <button id="openAccountBtn" class="logout-icon-btn account-btn" title="Můj účet" aria-label="Můj účet">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+          <button id="logoutBtn" class="logout-icon-btn" title="Odhlásit se" aria-label="Odhlásit se">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- TISKOVÁ HLAVIČKA -->
+    <div class="print-only-header">
+      <div class="print-brand-row">
+        <div class="print-brand-title">
+          <div class="print-logo-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path>
+              <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path>
+              <path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path>
+            </svg>
+          </div>
+          <div>
+            <h1 class="print-title">Kniha jízd a výdajů za palivo</h1>
+            <p class="print-meta" id="printReportMeta">Vygenerováno z FuelFlow • Období: Vše</p>
+          </div>
+        </div>
+        <div class="print-org-info">
+          <p><strong>Uživatel:</strong> <span id="printUserEmail"></span></p>
+          <p><strong>Datum vystavení:</strong> <span id="printReportDate"></span></p>
+        </div>
+      </div>
+      <div class="print-kpi-summary" id="printKpiSummary"></div>
+    </div>
+
+    <main class="dashboard-main">
+
+      <!-- ÚVOD + AKCE -->
+      <section class="hero-row" id="sec-overview" data-reveal>
+        <div class="hero-greeting">
+          <p class="hero-eyebrow" id="todayLabel"></p>
+          <h1>Vítejte zpět, <span id="welcomeName">řidiči</span></h1>
+          <p class="hero-sub">Přehled nákladů na palivo · <span class="badge-period" id="activePeriodLabel">Vše</span></p>
+        </div>
+        <div class="hero-actions">
+          <button id="openWrappedBtn" class="btn-wrapped">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"></path><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"></path></svg>
+            <span>Roční shrnutí</span>
+          </button>
+          <button id="openGarageBtn" class="btn-secondary-action">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path>
+              <circle cx="7" cy="17" r="2"></circle>
+              <path d="M9 17h6"></path>
+              <circle cx="17" cy="17" r="2"></circle>
+            </svg>
+            Vozový park
+          </button>
+          <button id="openModalBtn" class="btn-action-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Nové tankování
+          </button>
+        </div>
+      </section>
+
+      <!-- FILTRY OBDOBÍ & AUT -->
+      <div class="filter-header-bar" data-reveal>
+        <!-- Vlastní rozbalovací menu; skrytý <select> dál drží hodnotu pro app.js -->
+        <div class="custom-select" id="vehicleFilterMenu">
+          <select id="vehicleFilterSelect" class="native-select" aria-hidden="true" tabindex="-1">
+            <option value="all">Všechna vozidla</option>
+          </select>
+          <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Filtrovat podle vozidla">
+            <span class="custom-select-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg>
+            </span>
+            <span class="custom-select-text">
+              <span class="custom-select-caption">Vozidlo</span>
+              <span class="custom-select-label">Všechna vozidla</span>
+            </span>
+            <svg class="custom-select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <ul class="custom-select-panel" role="listbox" aria-label="Vozidla" data-lenis-prevent></ul>
+        </div>
+
+        <div class="period-pills liquid-group" role="group" aria-label="Období">
+          <button class="pill-btn liquid-item active" data-period="all">Vše</button>
+          <button class="pill-btn liquid-item" data-period="year">Tento rok</button>
+          <button class="pill-btn liquid-item" data-period="6m">6 měsíců</button>
+          <button class="pill-btn liquid-item" data-period="month">Tento měsíc</button>
+        </div>
+      </div>
+
+      <!-- 4 KPI KARTY -->
+      <section class="kpi-row">
+        <div class="kpi-box kpi-feature glow-card" data-reveal>
+          <div class="kpi-feature-glow" aria-hidden="true"></div>
+          <div class="kpi-top">
+            <span class="kpi-title">Celková útrata</span>
+            <div class="kpi-icon-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="3"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value"><span id="kpiTotal">0</span> <small>Kč</small></div>
+          <div class="kpi-foot" id="kpiTotalSub"><span class="dot-small"></span> Za vybrané období</div>
+        </div>
+
+        <div class="kpi-box glow-card" data-reveal>
+          <div class="kpi-top">
+            <span class="kpi-title">Tento měsíc</span>
+            <div class="kpi-icon-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="3"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value"><span id="kpiMonth">0</span> <small>Kč</small></div>
+          <div class="kpi-foot text-muted" id="kpiMonthSub">Minulý měsíc: 0 Kč</div>
+        </div>
+
+        <div class="kpi-box glow-card" data-reveal>
+          <div class="kpi-top">
+            <span class="kpi-title">Posledních 7 dní</span>
+            <div class="kpi-icon-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value"><span id="kpiWeek">0</span> <small>Kč</small></div>
+          <div class="kpi-foot"><span class="kpi-chip" id="kpiWeekCount">0 tankování</span> týdenní souhrn</div>
+        </div>
+
+        <div class="kpi-box glow-card" data-reveal>
+          <div class="kpi-top">
+            <span class="kpi-title">Průměrná cena</span>
+            <div class="kpi-icon-pill">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 22v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8"></path>
+                <path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path>
+                <path d="M3 9V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value"><span id="kpiAvgPrice">0,0</span> <small>Kč/l</small></div>
+          <div class="kpi-foot split-foot">
+            <span><span id="kpiTotalLitres">0,0</span> l celkem</span>
+            <span id="kpiLitreRecordsCount">0 záznamů</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- WIDGET: MĚSÍČNÍ ROZPOČET -->
+      <section class="budget-card glow-card" id="sec-budget" data-reveal>
+        <div class="budget-head">
+          <div class="budget-title-wrap">
+            <div class="budget-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 id="budgetWidgetTitle">Měsíční rozpočet: Celý vozový park</h3>
+              <p id="budgetWidgetSubtitle">Hlídač nákladů pro aktuální kalendářní měsíc</p>
+            </div>
+          </div>
+
+          <div class="budget-action-wrap">
+            <div class="budget-figures">
+              <span class="spent-txt"><strong id="budgetSpentVal">0 Kč</strong> z <span id="budgetTotalVal">5 000 Kč</span></span>
+              <span class="budget-percent-badge" id="budgetPercentBadge">0 %</span>
+            </div>
+            <button id="openBudgetModalBtn" class="btn-budget-edit" title="Upravit měsíční limit" aria-label="Upravit měsíční limit">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="budget-progress-track">
+          <div class="budget-forecast-bar" id="budgetForecastBar"></div>
+          <div class="budget-progress-bar" id="budgetProgressBar"></div>
+        </div>
+        <div class="budget-foot">
+          <span id="budgetRemainingTxt">Zbývá: 5 000 Kč</span>
+          <span class="budget-forecast" id="budgetForecastTxt"></span>
+          <span class="budget-status-tip" id="budgetStatusTip">Čerpání je pod kontrolou</span>
+        </div>
+      </section>
+
+      <!-- GRAFY -->
+      <section class="charts-row" id="sec-charts">
+        <div class="chart-card-clean glow-card" data-reveal>
+          <div class="chart-header">
+            <div>
+              <h3>Vývoj útraty za palivo</h3>
+              <p>Jednotlivá tankování nebo součty po měsících</p>
+            </div>
+            <div class="segmented-control liquid-group">
+              <button class="seg-btn liquid-item active" data-chartmode="daily">Průběh</button>
+              <button class="seg-btn liquid-item" data-chartmode="monthly">Měsíčně</button>
+            </div>
+          </div>
+          <div class="canvas-holder">
+            <canvas id="timeSeriesChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card-clean donut-card glow-card" data-reveal>
+          <div class="chart-header">
+            <div>
+              <h3>Rozdělení nákladů</h3>
+              <p>Podle vozidel, paliv či stanic</p>
+            </div>
+          </div>
+          <div class="segmented-control liquid-group donut-seg">
+            <button class="seg-donut liquid-item active" data-donut="vehicle">Auto</button>
+            <button class="seg-donut liquid-item" data-donut="fuel">Palivo</button>
+            <button class="seg-donut liquid-item" data-donut="station">Stanice</button>
+          </div>
+          <div class="donut-wrapper">
+            <canvas id="doughnutChart"></canvas>
+            <div class="donut-center-info">
+              <span class="donut-lbl" id="donutCenterLabel">VOZIDLA</span>
+              <strong class="donut-val" id="donutCenterValue">1 auto</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SPOTŘEBA -->
+      <section class="consumption-card glow-card" id="sec-consumption" data-reveal>
+        <div class="chart-header">
+          <div>
+            <h3>Spotřeba a náklady na kilometr</h3>
+            <p>Počítá se mezi dvěma tankováními do plna se zadaným tachometrem</p>
+          </div>
+        </div>
+        <div class="consumption-body">
+          <div class="consumption-stats">
+            <div class="cons-stat cons-stat-main">
+              <span class="cons-label">Průměrná spotřeba</span>
+              <strong><span id="consPer100">–</span> <small>l/100 km</small></strong>
+            </div>
+            <div class="cons-stat">
+              <span class="cons-label">Náklady na 1 km</span>
+              <strong><span id="consCostKm">–</span> <small>Kč/km</small></strong>
+            </div>
+            <div class="cons-stat">
+              <span class="cons-label">Najeto (měřené úseky)</span>
+              <strong><span id="consDistance">–</span> <small>km</small></strong>
+            </div>
+          </div>
+          <div class="consumption-chart">
+            <canvas id="consumptionChart"></canvas>
+            <div class="consumption-empty hidden" id="consumptionEmpty">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 12l4-3"></path><path d="M7 16h10"></path></svg>
+              <strong>Zatím není z čeho počítat</strong>
+              <p>Při tankování vyplňte <b>stav tachometru</b> a zaškrtněte <b>Plná nádrž</b>. Spotřeba se ukáže od druhého tankování do plna.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PŘIPOMÍNKY SERVISU -->
+      <section class="service-card glow-card" id="sec-service" data-reveal>
+        <div class="table-head-row">
+          <div>
+            <h3>Servis a připomínky</h3>
+            <p>STK, olej, dálniční známka a další termíny – podle data i kilometrů</p>
+          </div>
+          <button id="openReminderBtn" class="btn-secondary-action">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Přidat připomínku
+          </button>
+        </div>
+        <div class="reminder-list" id="reminderList"></div>
+      </section>
+
+      <!-- TABULKA ZÁZNAMŮ -->
+      <section class="table-container-card" id="sec-history" data-reveal>
+        <div class="table-head-row">
+          <div>
+            <h3>Historie tankování</h3>
+            <p>Všechna vaše tankování na jednom místě</p>
+          </div>
+          <div class="search-input-field">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="search" id="tableFilter" placeholder="Hledat záznam…" aria-label="Hledat v historii" enterkeyhint="search" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="styled-table">
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Vozidlo</th>
+                <th>Částka</th>
+                <th>Objem</th>
+                <th>Cena/litr</th>
+                <th>Palivo</th>
+                <th>Čerpací stanice</th>
+                <th>Poznámka</th>
+                <th class="text-right">Akce</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody">
+              <tr><td colspan="9" class="text-center py-4 text-muted">Načítám záznamy…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PATIČKA -->
+      <footer class="app-footer" data-reveal>
+        <div class="footer-left">
+          <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span>Server: <strong id="serverStatusText">Online</strong></span>
+            <span class="status-ping" id="dbPingBadge">–</span>
+          </div>
+          <span class="footer-divider">•</span>
+          <span class="footer-copy">Fuel Flow &copy; 2026</span>
+          <span class="footer-divider">•</span>
+          <button type="button" class="footer-link" data-open-privacy>Soukromí a cookies</button>
+        </div>
+
+        <div class="footer-right">
+          <button id="printPdfBtn" class="btn-footer-action" title="Vytisknout nebo uložit jako PDF">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Tisk / PDF
+          </button>
+
+          <button id="exportCsvBtn" class="btn-footer-action" title="Stáhnout tabulku do Excelu / CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            CSV
+          </button>
+
+          <button id="exportJsonBtn" class="btn-footer-action" title="Záloha ve formátu JSON">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            JSON
+          </button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- MODAL: NOVÉ TANKOVÁNÍ -->
+  <div id="fuelModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </div>
+          <div>
+            <h3>Nové tankování</h3>
+            <p>Zadejte podrobnosti o výdaji</p>
+          </div>
+        </div>
+        <button id="closeModalBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <form id="fuelForm">
+        <div class="form-grid">
+          <div class="form-group full-w">
+            <label for="modalVehicleSelect">Vozidlo *</label>
+            <select id="modalVehicleSelect" required>
+              <option value="" data-placeholder="1">Vyberte vozidlo</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="amountInput">Částka (Kč) *</label>
+            <input type="text" id="amountInput" inputmode="decimal" pattern="\s*\d[\d\s]*([.,]\d{1,2})?\s*" title="Částka, např. 1850 nebo 1850,50" placeholder="např. 1850" autocomplete="off" enterkeyhint="next" required>
+          </div>
+
+          <div class="form-group">
+            <label for="dateInput">Datum tankování *</label>
+            <input type="date" id="dateInput" required>
+          </div>
+
+          <div class="form-group">
+            <label for="litresInput">Litry (volitelné)</label>
+            <input type="text" id="litresInput" inputmode="decimal" pattern="\s*\d+([.,]\d{1,2})?\s*" title="Litry, např. 42,5" placeholder="např. 42,5" autocomplete="off" enterkeyhint="next">
+          </div>
+
+          <div class="form-group">
+            <label for="fuelType">Palivo</label>
+            <select id="fuelType">
+              <option value="Natural 95">Natural 95</option>
+              <option value="Natural 98">Natural 98 / 100</option>
+              <option value="Diesel">Diesel</option>
+              <option value="LPG">LPG / CNG</option>
+              <option value="Elektro">Elektřina</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="odometerInput">Stav tachometru (km)</label>
+            <input type="number" id="odometerInput" step="1" min="0" max="9999999" inputmode="numeric" placeholder="např. 45230" enterkeyhint="next">
+          </div>
+
+          <div class="form-group">
+            <label>Tankování</label>
+            <label class="switch-field" for="fullTankInput">
+              <input type="checkbox" id="fullTankInput">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-text">Plná nádrž</span>
+            </label>
+          </div>
+
+          <div class="form-group full-w">
+            <label for="stationInput">Čerpací stanice</label>
+            <input type="text" id="stationInput" list="stationList" maxlength="100" placeholder="např. Shell, Orlen, MOL…" enterkeyhint="next">
+            <datalist id="stationList">
+              <option value="Orlen / Benzina">
+              <option value="MOL">
+              <option value="Shell">
+              <option value="OMV">
+              <option value="EuroOil">
+              <option value="Globus">
+            </datalist>
+          </div>
+
+          <div class="form-group full-w">
+            <label for="noteInput">Poznámka</label>
+            <input type="text" id="noteInput" maxlength="500" placeholder="Tachometr, plná nádrž…" enterkeyhint="done">
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" id="cancelModalBtn" class="btn-secondary">Zrušit</button>
+          <button type="submit" class="btn-action-primary">Uložit tankování</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SPRÁVA VOZOVÉHO PARKU -->
+  <div id="garageModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path>
+              <circle cx="7" cy="17" r="2"></circle>
+              <path d="M9 17h6"></path>
+              <circle cx="17" cy="17" r="2"></circle>
+            </svg>
+          </div>
+          <div>
+            <h3>Vozový park</h3>
+            <p>Přidejte vozidlo a zvolte barvu pro grafy</p>
+          </div>
+        </div>
+        <button id="closeGarageBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <form id="vehicleForm" class="vehicle-add-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="vehName">Název auta / Model *</label>
+            <input type="text" id="vehName" maxlength="100" placeholder="např. Škoda Octavia" required>
+          </div>
+          <div class="form-group">
+            <label for="vehPlate">SPZ (volitelné)</label>
+            <input type="text" id="vehPlate" maxlength="20" placeholder="např. 1AB 2345" autocapitalize="characters" autocorrect="off" spellcheck="false">
+          </div>
+          <div class="form-group">
+            <label for="vehBudget">Měsíční limit pro auto (Kč)</label>
+            <input type="text" id="vehBudget" inputmode="decimal" pattern="\s*\d[\d\s]*([.,]\d+)?\s*" title="Částka v Kč, např. 5000" value="5000" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="vehColor">Barva auta v grafu</label>
+            <div class="color-picker-badge-wrap">
+              <label class="color-preview-circle" for="vehColor" id="colorPreviewBox" style="background-color: #c6ff34;">
+                <input type="color" id="vehColor" value="#c6ff34">
+              </label>
+              <div class="color-text-info">
+                <span class="color-hex-label" id="colorHexVal">#C6FF34</span>
+                <span class="color-hint-sub">Zvolit odstín</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-action-primary w-full mt-2">Přidat vozidlo do garáže</button>
+      </form>
+
+      <div class="garage-list-section">
+        <h4>Vaše auta</h4>
+        <div id="garageList" class="garage-items-list">
+          <p class="text-muted text-sm">Zatím nemáte přidané žádné auto.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ZMĚNA ROZPOČTU -->
+  <div id="budgetModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path>
+              <path d="M4 6v12a2 2 0 0 0 2 2h14v-4"></path>
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3>Nastavit měsíční limit</h3>
+            <p id="budgetModalDesc">Zadejte plánovaný měsíční rozpočet na palivo</p>
+          </div>
+        </div>
+        <button id="closeBudgetModalBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <form id="budgetForm">
+        <div class="form-group full-w">
+          <label for="budgetLimitInput">Měsíční částka limitu</label>
+          <div class="input-icon-wrap">
+            <svg class="input-svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="6" x2="12" y2="18"></line>
+              <line x1="8" y1="10" x2="16" y2="10"></line>
+            </svg>
+            <input type="text" id="budgetLimitInput" inputmode="decimal" pattern="\s*\d[\d\s]*([.,]\d+)?\s*" title="Částka v Kč, např. 6000" required placeholder="např. 6000" autocomplete="off" enterkeyhint="done">
+            <span class="input-suffix-tag">Kč / měs</span>
+          </div>
+        </div>
+
+        <div class="quick-budget-pills">
+          <span class="quick-lbl">Rychlé volby:</span>
+          <button type="button" class="btn-quick-val" data-val="3000">3 000 Kč</button>
+          <button type="button" class="btn-quick-val" data-val="5000">5 000 Kč</button>
+          <button type="button" class="btn-quick-val" data-val="8000">8 000 Kč</button>
+          <button type="button" class="btn-quick-val" data-val="12000">12 000 Kč</button>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" id="cancelBudgetModalBtn" class="btn-secondary">Zrušit</button>
+          <button type="submit" class="btn-action-primary">Uložit limit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: JAK TO FUNGUJE? -->
+  <div id="helpModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card modal-help-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div>
+            <h3>Jak Fuel Flow funguje?</h3>
+            <p>Rychlý přehled možností sledování nákladů</p>
+          </div>
+        </div>
+        <button id="closeHelpBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <div class="help-grid">
+        <div class="help-feature-card">
+          <div class="help-badge-num">1</div>
+          <div class="help-card-body">
+            <h4>Správa aut a evidence</h4>
+            <p>Ve <strong>Vozovém parku</strong> si založte svá auta a zvolte barvu. Při každém tankování vyberte auto, částku a litry – cena za litr se dopočítá automaticky.</p>
+          </div>
+        </div>
+
+        <div class="help-feature-card">
+          <div class="help-badge-num">2</div>
+          <div class="help-card-body">
+            <h4>Chytré hlídání rozpočtu</h4>
+            <p>Nastavte si měsíční strop nákladů. U volby <em>Všechna vozidla</em> se hlídá celkový rozpočet. Pokud přepnete na konkrétní auto, widget sleduje pouze jeho limit.</p>
+          </div>
+        </div>
+
+        <div class="help-feature-card">
+          <div class="help-badge-num">3</div>
+          <div class="help-card-body">
+            <h4>Interaktivní grafy</h4>
+            <p>Sledujte průběh výdajů v čase nebo součty po měsících. Prstencový graf ukáže poměr nákladů podle aut, druhů paliva nebo čerpacích stanic.</p>
+          </div>
+        </div>
+
+        <div class="help-feature-card">
+          <div class="help-badge-num">4</div>
+          <div class="help-card-body">
+            <h4>Tisk do PDF a exporty</h4>
+            <p>Kliknutím na <strong>Tisk / PDF</strong> v zápatí získáte přehledný výkaz pro tisk nebo účetnictví. Data můžete kdykoliv exportovat do CSV či JSON.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="confirmHelpBtn" class="btn-action-primary w-full">Rozumím, pokračovat do aplikace</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVÁ PŘIPOMÍNKA -->
+  <div id="reminderModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          </div>
+          <div>
+            <h3>Nová připomínka</h3>
+            <p>Termín zadejte datem, kilometry, nebo obojím</p>
+          </div>
+        </div>
+        <button id="closeReminderBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <form id="reminderForm">
+        <div class="reminder-presets" id="reminderPresets">
+          <button type="button" class="btn-quick-val" data-title="STK a emise">STK</button>
+          <button type="button" class="btn-quick-val" data-title="Výměna oleje">Olej</button>
+          <button type="button" class="btn-quick-val" data-title="Dálniční známka">Dálniční známka</button>
+          <button type="button" class="btn-quick-val" data-title="Přezutí pneumatik">Pneumatiky</button>
+          <button type="button" class="btn-quick-val" data-title="Povinné ručení">Pojištění</button>
+          <button type="button" class="btn-quick-val" data-title="Servisní prohlídka">Servis</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group full-w">
+            <label for="reminderTitle">Název *</label>
+            <input type="text" id="reminderTitle" maxlength="100" placeholder="např. Výměna oleje" required>
+          </div>
+          <div class="form-group full-w">
+            <label for="reminderVehicle">Vozidlo</label>
+            <select id="reminderVehicle">
+              <option value="">Bez konkrétního vozidla</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="reminderDate">Termín – datum</label>
+            <input type="date" id="reminderDate">
+          </div>
+          <div class="form-group">
+            <label for="reminderKm">Termín – při km</label>
+            <input type="number" id="reminderKm" step="1" min="0" max="9999999" inputmode="numeric" placeholder="např. 60000" enterkeyhint="done">
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" id="cancelReminderBtn" class="btn-secondary">Zrušit</button>
+          <button type="submit" class="btn-action-primary">Uložit připomínku</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: MŮJ ÚČET -->
+  <div id="accountModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card account-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle account-avatar" id="accountAvatar">U</div>
+          <div>
+            <h3>Můj účet</h3>
+            <p id="accountEmail">uzivatel@email.cz</p>
+          </div>
+        </div>
+        <button id="closeAccountBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <section class="account-section">
+        <h4>Změna hesla</h4>
+        <form id="passwordForm" class="form-grid">
+          <div class="form-group full-w">
+            <label for="currentPassword">Současné heslo</label>
+            <input type="password" id="currentPassword" autocomplete="current-password" required>
+          </div>
+          <div class="form-group full-w">
+            <label for="newPassword">Nové heslo</label>
+            <input type="password" id="newPassword" autocomplete="new-password" minlength="6" maxlength="72" placeholder="Minimálně 6 znaků" required>
+          </div>
+          <div class="full-w account-actions">
+            <button type="submit" class="btn-action-primary">Změnit heslo</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="account-section">
+        <h4>Moje data</h4>
+        <p class="account-note">Kompletní záloha tankování, vozidel i připomínek ve formátu JSON. Data si můžete kdykoliv stáhnout.</p>
+        <div class="account-actions">
+          <button type="button" id="accountExportBtn" class="btn-secondary-action">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Stáhnout všechna data
+          </button>
+          <button type="button" class="btn-secondary" data-open-privacy>Soukromí a cookies</button>
+        </div>
+      </section>
+
+      <section class="account-section danger-zone">
+        <h4>Smazat účet</h4>
+        <p class="account-note">Účet, všechna tankování, vozidla i připomínky budou <strong>trvale odstraněny</strong>. Tuto akci nelze vrátit.</p>
+        <form id="deleteAccountForm" class="delete-account-form">
+          <div class="form-group">
+            <label for="deleteAccountPassword">Pro potvrzení zadejte heslo</label>
+            <input type="password" id="deleteAccountPassword" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn-danger">Trvale smazat účet</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- MODAL: SOUKROMÍ A COOKIES -->
+  <div id="privacyModal" class="modal-overlay hidden" data-lenis-prevent>
+    <div class="modal-card privacy-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <div>
+            <h3>Soukromí a cookies</h3>
+            <p>Stručně a srozumitelně, jak s daty zacházíme</p>
+          </div>
+        </div>
+        <button id="closePrivacyBtn" class="btn-close-modal" aria-label="Zavřít">&times;</button>
+      </div>
+
+      <div class="privacy-highlight">
+        <strong>Žádné sledování, žádná reklama, žádné třetí strany.</strong>
+        <span>Proto po vás nechceme souhlas s cookies – používáme jen to, bez čeho aplikace nefunguje.</span>
+      </div>
+
+      <div class="privacy-grid">
+        <div class="privacy-item">
+          <h4>Cookies</h4>
+          <p>Jediná cookie <code>PHPSESSID</code> udržuje vaše přihlášení a po zavření prohlížeče se smaže. Je nezbytná pro fungování služby, a proto nevyžaduje souhlas.</p>
+        </div>
+        <div class="privacy-item">
+          <h4>Úložiště prohlížeče</h4>
+          <p>V <code>localStorage</code> si pamatujeme jen zvolený světlý/tmavý režim. Nic se z něj neodesílá na server.</p>
+        </div>
+        <div class="privacy-item">
+          <h4>Jaká data ukládáme</h4>
+          <p>E-mail, heslo (pouze jako bezpečný bcrypt hash, nikdy v čitelné podobě), tankování, vozidla, rozpočty a připomínky servisu, které sami zadáte.</p>
+        </div>
+        <div class="privacy-item">
+          <h4>Třetí strany</h4>
+          <p>Písmo i všechny knihovny jsou uložené přímo na našem serveru. Prohlížeč tak nekontaktuje Google ani jiné služby a vaše IP adresa nikam dál neodchází.</p>
+        </div>
+        <div class="privacy-item">
+          <h4>Vaše práva</h4>
+          <p>Data si můžete kdykoliv stáhnout (<em>Můj účet → Stáhnout všechna data</em>) a účet i se všemi daty trvale smazat. Opravit je můžete přímo v aplikaci.</p>
+        </div>
+        <div class="privacy-item">
+          <h4>Zabezpečení</h4>
+          <p>Každý vidí jen svá data, přístupy jsou chráněné na serveru a opakované pokusy o přihlášení se dočasně blokují.</p>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="confirmPrivacyBtn" class="btn-action-primary w-full">Rozumím</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: POTVRZENÍ AKCE -->
+  <div id="confirmModal" class="modal-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <div class="modal-card modal-confirm-card">
+      <div class="modal-head">
+        <div class="modal-title">
+          <div class="icon-circle danger-circle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 id="confirmTitle">Opravdu smazat?</h3>
+            <p id="confirmMessage"></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="confirmCancelBtn" class="btn-secondary">Zrušit</button>
+        <button type="button" id="confirmOkBtn" class="btn-danger">Smazat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFIKACE -->
+  <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js?v=7.0"></script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+/* ==========================================================================
+   FUEL FLOW – ADMINISTRACE
+   Staví na css/style.css (tokeny, karty, formuláře, tlačítka)
+   ========================================================================== */
+
+.admin-body { min-height: 100vh; }
+
+.admin-login-layout {
+  position: relative;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 40px 18px;
+}
+.admin-login-layout .auth-box { justify-self: center; }
+.admin-login-layout #adminLoginForm { display: flex; flex-direction: column; gap: 14px; }
+
+/* Rozvržení: postranní panel + obsah */
+.admin-shell {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 22px;
+  max-width: 1500px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 18px;
+}
+
+/* Postranní panel je vždy tmavý (inspirace Helios) */
+.admin-sidebar {
+  --nav-text: rgba(255, 255, 255, 0.6);
+  position: sticky;
+  top: 18px;
+  height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 22px 16px;
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(280px 220px at 0% 0%, rgba(198, 255, 52, 0.14), transparent 70%),
+    radial-gradient(260px 260px at 100% 100%, rgba(86, 58, 150, 0.45), transparent 70%),
+    #111113;
+  color: #f3f4ef;
+  box-shadow: var(--shadow-md);
+}
+.admin-brand { display: flex; align-items: center; gap: 12px; padding: 0 6px; }
+.admin-brand > div:last-child { display: flex; flex-direction: column; line-height: 1.1; }
+.admin-badge {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(198, 255, 52, 0.14);
+  color: #c6ff34;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  color: var(--nav-text);
+  font-size: 14.5px;
+  font-weight: 500;
+  text-align: left;
+}
+@media (hover: hover) and (pointer: fine) {
+  .admin-nav-link:hover { color: #ffffff; }
+}
+.admin-nav .liquid-blob { border-radius: 16px; }
+
+.admin-sidebar-card {
+  margin-top: auto;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.admin-sidebar-card strong { display: block; color: #ffffff; font-size: 13.5px; margin-bottom: 4px; }
+.admin-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .admin-back:hover { background: rgba(255, 255, 255, 0.06); color: #ffffff; }
+}
+
+.admin-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; padding: 4px 4px 40px; }
+.admin-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}
+.admin-top h1 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 500; letter-spacing: -0.035em; line-height: 1.05; }
+.admin-view { display: flex; flex-direction: column; gap: 20px; animation: fadeUp 0.5s var(--ease-out) both; }
+.admin-view.hidden { display: none !important; }
+
+.admin-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
+.admin-grid .canvas-holder { min-height: 320px; }
+
+/* Audit log */
+.audit-list { display: flex; flex-direction: column; gap: 8px; }
+.audit-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.audit-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.25); }
+.audit-delete_user .audit-dot { background: var(--danger); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+.audit-reset_password .audit-dot { background: #99e1d9; box-shadow: 0 0 0 3px rgba(153, 225, 217, 0.3); }
+.audit-main { display: flex; flex-direction: column; min-width: 0; }
+.audit-main strong { font-size: 13.5px; font-weight: 600; }
+.audit-main span { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audit-list.is-full .audit-main span { white-space: normal; }
+.audit-meta { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: var(--text-muted); text-align: right; }
+.audit-meta time { font-weight: 600; color: var(--text-main); }
+.audit-empty { padding: 26px 10px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+/* Nástroje nad seznamem uživatelů */
+.admin-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.admin-toolbar .search-input-field { flex: 1; min-width: 220px; }
+.admin-toolbar .search-input-field input,
+.admin-toolbar .search-input-field input:focus { width: 100%; background: var(--surface); box-shadow: var(--shadow-sm); height: 48px; }
+.admin-toolbar .segmented-control { background: var(--surface); box-shadow: var(--shadow-sm); }
+.admin-sort { min-width: 230px; }
+.admin-sort .custom-select.is-field .custom-select-trigger { height: 48px; border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--shadow-sm); }
+
+/* Seznam uživatelů */
+.user-list-head,
+.user-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 2.2fr) 1fr 1.1fr 0.5fr 0.7fr 1fr 24px;
+  align-items: center;
+  gap: 12px;
+}
+.user-list-head {
+  padding: 0 14px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.user-list { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; }
+.user-row {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 13.5px;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.25s var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .user-row:hover { background: var(--surface-2); transform: translateX(3px); }
+}
+.user-cell-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.user-cell-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.user-cell-text strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+.role-badge {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.role-badge.is-admin { background: var(--carbon); color: var(--accent); }
+[data-theme="dark"] .role-badge.is-admin { background: var(--accent); color: var(--accent-ink); }
+.role-badge.is-you { background: rgba(153, 225, 217, 0.4); color: #0f2f2b; }
+.user-amount { font-weight: 600; }
+.user-chevron { color: var(--text-faint); transition: transform 0.25s var(--ease-spring), color 0.2s ease; }
+@media (hover: hover) and (pointer: fine) {
+  .user-row:hover .user-chevron { transform: translateX(3px); color: var(--text-main); }
+}
+
+.admin-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 6px 6px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.pagination-info { font-size: 13px; color: var(--text-muted); }
+.pagination-pages { display: flex; gap: 4px; }
+.page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  font-weight: 600;
+  transition: transform 0.2s var(--ease-spring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .page-btn:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+}
+.page-btn.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.page-gap { padding: 0 4px; color: var(--text-muted); align-self: center; }
+
+/* Vysouvací detail uživatele */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 10, 12, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: overlayIn 0.3s ease;
+}
+.drawer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: drawerIn 0.5s var(--ease-spring);
+}
+@keyframes drawerIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-head .modal-title { min-width: 0; }
+.drawer-head .modal-title > div:last-child { min-width: 0; }
+.drawer-head h3 { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-head p { font-size: 12.5px; color: var(--text-muted); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+.drawer-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.drawer-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.drawer-stats span { font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
+.drawer-stats strong { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.drawer-section .account-actions { margin-top: 14px; }
+.drawer-list { display: flex; flex-direction: column; gap: 6px; }
+.drawer-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.drawer-loading { display: flex; justify-content: center; gap: 6px; padding: 60px 0; }
+.drawer-loading span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: loadingDot 0.9s ease-in-out infinite alternate;
+}
+.drawer-loading span:nth-child(2) { animation-delay: 0.15s; }
+.drawer-loading span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes loadingDot { from { transform: translateY(0); opacity: 0.4; } to { transform: translateY(-10px); opacity: 1; } }
+
+.input-with-action { display: flex; gap: 8px; align-items: center; }
+.input-with-action input { flex: 1; font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.04em; }
+.input-with-action .btn-quick-val { height: 46px; padding: 0 14px; border-radius: 14px; }
+
+/* ==========================================================================
+   RESPONZIVITA ADMINISTRACE
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .admin-grid { grid-template-columns: 1fr; }
+  .user-list-head { display: none; }
+  .user-row { grid-template-columns: minmax(0, 1fr) auto auto 24px; }
+  .user-row .user-cell[data-label="Registrace"],
+  .user-row .user-cell[data-label="Auta"] { display: none; }
+}
+
+@media (max-width: 900px) {
+  .admin-shell { grid-template-columns: 1fr; padding: 12px; gap: 14px; }
+  .admin-sidebar {
+    position: sticky;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    z-index: 50;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: var(--radius-pill);
+  }
+  .admin-brand { padding: 0 4px; }
+  .admin-brand .brand-name, .admin-sidebar-card { display: none; }
+  .admin-brand .admin-badge { margin: 0; }
+  .admin-nav { flex-direction: row; flex: 1; justify-content: center; }
+  .admin-nav-link { height: 42px; padding: 0 14px; border-radius: var(--radius-pill); }
+  .admin-nav .liquid-blob { border-radius: var(--radius-pill); }
+  .admin-back { height: 42px; padding: 0 12px; }
+  .admin-back { font-size: 0; gap: 0; }
+}
+
+@media (max-width: 640px) {
+  .admin-nav-link span { display: none; }
+  .admin-top .user-info { display: none; }
+  .admin-toolbar { flex-direction: column; align-items: stretch; }
+  .admin-toolbar .segmented-control { justify-content: space-between; }
+  .admin-toolbar .seg-btn { flex: 1; }
+  .admin-sort { min-width: 0; }
+  .admin-sort .custom-select, .admin-sort .custom-select-trigger { width: 100%; }
+  .user-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+  .user-row .user-cell[data-label="Přihlášení"],
+  .user-row .user-cell[data-label="Tankování"] { display: none; }
+  .user-row .user-chevron { display: none; }
+  .drawer { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: calc(100vh - 40px); border-radius: 26px; }
+  @keyframes drawerIn { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .drawer-stats { grid-template-columns: 1fr 1fr; }
+  .audit-item { grid-template-columns: 10px minmax(0, 1fr); }
+  .audit-meta { grid-column: 2; align-items: flex-start; text-align: left; flex-direction: row; gap: 8px; }
+}

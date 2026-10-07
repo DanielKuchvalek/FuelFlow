@@ -1,0 +1,8 @@
+# Prohlížeč si musí u každého načtení ověřit, že má aktuální verzi souborů.
+# Nezměněný soubor se nestahuje znovu (server odpoví 304 podle ETagu),
+# ale po úpravě kódu se nikdy nepoužije stará verze z cache.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

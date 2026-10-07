@@ -1,0 +1,9 @@
+# Lokální konfigurace s hesly (vzor: api/config.example.php)
+api/config.php
+.env
+.env.*
+
+# Systém a editory
+.DS_Store
+.vscode/
+.claude/settings.local.json
